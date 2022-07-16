@@ -23,13 +23,14 @@
 module Perspectives.Utilities where 
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
-import Data.Array (cons, uncons)
+import Data.Array (cons, elemIndex, uncons)
 import Data.Foldable (intercalate)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Map (Map)
+import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, foldMap)
-import Prelude (class Monad, class Show, type (~>), bind, map, pure, show, (<>), (>>=))
+import Prelude (class Eq, class Monad, class Show, type (~>), bind, map, pure, show, (<>), (>>=), ($))
 import Prim.RowList as RL
 import Record.Unsafe (unsafeGet)
 import Type.Data.RowList (RLProxy(..))
@@ -62,6 +63,15 @@ findM criterium arr = case uncons arr of
       then pure (Just head)
       else findM criterium tail
   Nothing -> pure Nothing
+
+----------------------------------------------------------------------------------------
+---- ADDUNIQUE
+----------------------------------------------------------------------------------------
+-- | Add an array element only if it is not yet in the array.
+addUnique :: forall a. Eq a => a -> Array a -> Array a
+addUnique a arr = if isJust $ elemIndex a arr
+  then arr
+  else cons a arr
 
 ----------------------------------------------------------------------------------------
 ---- PRETTYPRINT
@@ -128,3 +138,6 @@ instance prettyPrintRecordFieldsCons
       key = reflectSymbol (SProxy :: SProxy key)
       focus = (unsafeGet key record :: focus)
       tail = prettyPrintRecordFields tab (RLProxy :: RLProxy rowlistTail) record
+
+instance PrettyPrint (Map k v) where
+  prettyPrint' tab o = "<implement prettyprint for maps!>"
