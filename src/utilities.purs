@@ -27,13 +27,13 @@ import Data.Array (cons, elemIndex, uncons)
 import Data.Foldable (intercalate)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..), maybe, isJust)
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Reflectable (class Reflectable, reflectType)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, foldMap)
-import Prelude (class Eq, class Monad, class Show, type (~>), bind, map, pure, show, (<>), (>>=), ($))
 import Prim.RowList as RL
-import Record.Unsafe (unsafeGet)
-import Type.Data.RowList (RLProxy(..))
+import Record (get)
+import Type.Proxy (Proxy(..))
+import Prelude
 
 onNothing :: forall m a e. MonadThrow e m => e -> m (Maybe a) -> m a
 onNothing s ma = ma >>= (maybe (throwError s) pure)
@@ -117,27 +117,27 @@ newline = "\n"
 -- |  * providing every value with an extra indent.
 -- |  * ending with a closing bracket on a new line.
 instance prettyPrintRecord :: (RL.RowToList rs rl, PrettyPrintRecordFields rl rs) => PrettyPrint (Record rs) where
-  prettyPrint' tab record = case prettyPrintRecordFields tab (RLProxy :: RLProxy rl) record  of
+  prettyPrint' tab record = case prettyPrintRecordFields tab (Proxy :: Proxy rl) record  of
     [] -> "{}"
     fields -> "\n" <> tab <> "{ " <> intercalate ("\n" <> tab <> ", " ) fields <> "\n" <> tab <> "}"
 
 class PrettyPrintRecordFields rowlist row where
-  prettyPrintRecordFields ::  String -> RLProxy rowlist -> Record row -> Array String
+  prettyPrintRecordFields ::  String -> Proxy rowlist -> Record row -> Array String
 
 instance prettyPrintRecordFieldsNil :: PrettyPrintRecordFields RL.Nil row where
   prettyPrintRecordFields _ _ _ = []
 
 instance prettyPrintRecordFieldsCons
-    ::  ( IsSymbol key
-        , PrettyPrintRecordFields rowlistTail row
+    ::  ( PrettyPrintRecordFields rowlistTail row
         , PrettyPrint focus
+        , Reflectable key Symbol
         )
     => PrettyPrintRecordFields (RL.Cons key focus rowlistTail) row where
-  prettyPrintRecordFields tab _ record = cons (key <> ": " <> (prettyPrint' (tab <> "  ") focus)) tail
+  prettyPrintRecordFields tab _ record = cons (keyString <> ": " <> (prettyPrint' (tab <> "  ") focus)) tail
     where
-      key = reflectSymbol (SProxy :: SProxy key)
-      focus = (unsafeGet key record :: focus)
-      tail = prettyPrintRecordFields tab (RLProxy :: RLProxy rowlistTail) record
+      keyString = reflectType (Proxy :: Proxy key)
+      focus = (get (Proxy :: Proxy key) record :: focus)
+      tail = prettyPrintRecordFields tab (Proxy :: Proxy rowlistTail) record
 
 instance PrettyPrint (Map k v) where
   prettyPrint' tab o = "<implement prettyprint for maps!>"
