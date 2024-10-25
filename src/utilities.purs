@@ -22,18 +22,20 @@
 
 module Perspectives.Utilities where 
 
+import Prelude
+
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array (cons, elemIndex, uncons)
 import Data.Foldable (intercalate)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.Reflectable (class Reflectable, reflectType)
+import Data.Symbol (class IsSymbol)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, foldMap)
 import Prim.RowList as RL
-import Record (get)
+import Record.Unsafe (unsafeGet)
 import Type.Proxy (Proxy(..))
-import Prelude
 
 onNothing :: forall m a e. MonadThrow e m => e -> m (Maybe a) -> m a
 onNothing s ma = ma >>= (maybe (throwError s) pure)
@@ -121,6 +123,8 @@ instance prettyPrintRecord :: (RL.RowToList rs rl, PrettyPrintRecordFields rl rs
     [] -> "{}"
     fields -> "\n" <> tab <> "{ " <> intercalate ("\n" <> tab <> ", " ) fields <> "\n" <> tab <> "}"
 
+
+class PrettyPrintRecordFields :: forall k. k -> Row Type -> Constraint
 class PrettyPrintRecordFields rowlist row where
   prettyPrintRecordFields ::  String -> Proxy rowlist -> Record row -> Array String
 
@@ -129,14 +133,17 @@ instance prettyPrintRecordFieldsNil :: PrettyPrintRecordFields RL.Nil row where
 
 instance prettyPrintRecordFieldsCons
     ::  ( PrettyPrintRecordFields rowlistTail row
-        , PrettyPrint focus
-        , Reflectable key Symbol
+        , PrettyPrint valueType
+        , Reflectable key String
+        , IsSymbol key
         )
-    => PrettyPrintRecordFields (RL.Cons key focus rowlistTail) row where
-  prettyPrintRecordFields tab _ record = cons (keyString <> ": " <> (prettyPrint' (tab <> "  ") focus)) tail
+    => PrettyPrintRecordFields (RL.Cons key valueType rowlistTail) row where
+  prettyPrintRecordFields tab _ record = cons (keyString <> ": " <> (prettyPrint' (tab <> "  ") value)) tail
     where
       keyString = reflectType (Proxy :: Proxy key)
-      focus = (get (Proxy :: Proxy key) record :: focus)
+      -- See test2.purs for another attempt to make this work.
+      -- value = ((get (Proxy :: Proxy key) record) :: valueType)
+      value = unsafeGet keyString record :: valueType
       tail = prettyPrintRecordFields tab (Proxy :: Proxy rowlistTail) record
 
 instance PrettyPrint (Map k v) where
